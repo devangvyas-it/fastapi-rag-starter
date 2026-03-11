@@ -59,8 +59,18 @@ The API will be accessible at `http://localhost:8000`.
 ## API Endpoints
 
 - **`GET /`**: Health check.
+  ```bash
+  curl -X GET "http://localhost:8000/"
+  ```
 - **`POST /upload`**: Upload a text document.
+  ```bash
+  curl -X POST "http://localhost:8000/upload" -F "file=@\"D:\docker.txt\""
+  curl -X POST "http://localhost:8000/upload" -F "file=@\"D:\huggingface.txt\""
+  ```
 - **`POST /ask`**: Ask a question based on the uploaded documents.
+  ```bash
+  curl -X POST http://127.0.0.1:8000/ask -H "Content-Type: application/json" -d "{\"question\":\"How hugging face helpful to AI community?\"}"
+  ```
 
 ## License
 
