@@ -18,6 +18,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from transformers import pipeline, GenerationConfig
 import pickle
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from dotenv import load_dotenv
 import os
@@ -59,19 +60,19 @@ if os.path.exists(chunks_path):
         text_chunks = pickle.load(f)
 
 # Chunk size (characters)
-CHUNK_SIZE = 300
+CHUNK_SIZE = 500
+CHUNK_OVERLAP = 50
 
 
 def chunk_text(text):
-    chunks = []
-    start = 0
-
-    while start < len(text):
-        end = start + CHUNK_SIZE
-        chunks.append(text[start:end])
-        start = end
-
-    return chunks
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        length_function=len,
+        is_separator_regex=False,
+        separators=["\n\n", "\n", ". ", " ", ""]
+    )
+    return text_splitter.split_text(text)
 
 
 def process_document(file_path):
