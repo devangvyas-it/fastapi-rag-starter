@@ -13,15 +13,15 @@
 # limitations under the License.
 
 import os
-import faiss
+import uuid
 import numpy as np
+from qdrant_client import QdrantClient
+from qdrant_client.models import PointStruct
+from qdrant_client.models import VectorParams, Distance
 from sentence_transformers import SentenceTransformer
 from transformers import pipeline, GenerationConfig
-import pickle
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 from dotenv import load_dotenv
-import os
 
 # uncomment below to check available tasks
 # from transformers.pipelines import PIPELINE_REGISTRY
@@ -38,31 +38,37 @@ model = SentenceTransformer("all-MiniLM-L6-v2")
 
 qa_pipeline = pipeline(
             "text2text-generation",
-            model="google/flan-t5-small",
+            model="google/flan-t5-base",
             device=-1
         )
 
-# Global storage
-text_chunks = []
-index = None
+# vector db client
+db_client = None
 
 EMBEDDING_DIR = "data/embeddings"
 os.makedirs(EMBEDDING_DIR, exist_ok=True)
+collection_name = "docs"
 
-index_path = f"{EMBEDDING_DIR}/faiss_index.bin"
-chunks_path = f"{EMBEDDING_DIR}/chunks.pkl"
+def get_db_client():
+    global db_client
+    if db_client is None:
+        db_client = QdrantClient(path=EMBEDDING_DIR)
+        collections = db_client.get_collections().collections
+        collection_names = [c.name for c in collections]
 
-if os.path.exists(index_path):
-    index = faiss.read_index(index_path)
-
-if os.path.exists(chunks_path):
-    with open(chunks_path, "rb") as f:
-        text_chunks = pickle.load(f)
+        if collection_name not in collection_names:
+            db_client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(
+                    size=384,
+                    distance=Distance.COSINE
+                )
+            )
+    return db_client
 
 # Chunk size (characters)
-CHUNK_SIZE = 500
+CHUNK_SIZE = 300
 CHUNK_OVERLAP = 50
-
 
 def chunk_text(text):
     text_splitter = RecursiveCharacterTextSplitter(
@@ -76,78 +82,81 @@ def chunk_text(text):
 
 
 def process_document(file_path):
-    global index
-    global text_chunks
-
     # Read file
     with open(file_path, "r", encoding="utf-8") as f:
         text = f.read()
 
     # Split text
     chunks = chunk_text(text)
-
-    text_chunks.extend(chunks)
-
     # Generate embeddings
-    embeddings = model.encode(chunks)
+    embeddings = model.encode(chunks, normalize_embeddings=True)       
 
-    embeddings = np.array(embeddings).astype("float32")
+    embedding_data = []
+    for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+       embedding_data.append(
+            PointStruct(
+                id=str(uuid.uuid4()),
+                vector=embedding.tolist(),
+                payload={"text": chunk}
+            )
+        )
 
-    dimension = embeddings.shape[1]
-
-    # Initialize FAISS index if needed
-    if index is None:
-        index = faiss.IndexFlatL2(dimension)
-
-    index.add(embeddings)
-
-    faiss.write_index(index, f"{EMBEDDING_DIR}/faiss_index.bin")
-    with open(f"{EMBEDDING_DIR}/chunks.pkl", "wb") as f:
-        pickle.dump(text_chunks, f)
+    client = get_db_client()
+    client.upsert(
+        collection_name=collection_name,
+        points=embedding_data
+    )  
 
 
-def ask_question(question):
-    global index
-
-    if index is None or index.ntotal == 0:
-        return "No document has been processed yet.", 0.0
+def ask_question(question):   
 
     # Encode question
-    question_embedding = model.encode([question])
-    question_embedding = np.array(question_embedding).astype("float32")
+    question_embedding = model.encode(question, normalize_embeddings=True)
 
     # Search vector DB
     k = 3
-    # Ensure we don't ask for more results than exist
-    search_k = min(k, index.ntotal)
-    distances, indices = index.search(question_embedding, search_k)
+    # Ensure we don't ask for more results than exist    
+    client = get_db_client()
+    search_results = client.query_points(collection_name=collection_name,
+                                        query=question_embedding.tolist(),
+                                        limit=k)    
 
-    if len(indices[0]) == 0:
+    if not search_results.points:
         return "Could not find any relevant chunks.", 0.0
 
-    retrieved_chunks = [text_chunks[i] for i in indices[0]]
+    # Filter results based on a similarity threshold (e.g., 0.5)
+    threshold = 0.5
+    relevant_points = [point for point in search_results.points if point.score >= threshold]
 
-    # The first result is the best match (smallest L2 distance)    
-    best_distance = distances[0][0]
+    if not relevant_points:
+        return "Could not find any relevant chunks above the threshold.", 0.0
 
-    # Convert L2 distance to cosine similarity.
-    # The sentence-transformer model `all-MiniLM-L6-v2` produces normalized embeddings.
-    # For normalized vectors, cos_sim = 1 - (L2_dist^2 / 2).
-    similarity_score = 1 - (best_distance ** 2) / 2
-    similarity_score = float(max(0.0, similarity_score))  # Clamp to 0+
+    retrieved_chunks = [point.payload["text"] for point in relevant_points]
+
+    # The first result is the best match
+    similarity_score = relevant_points[0].score
 
     gen_config = GenerationConfig(
-        max_new_tokens=50,
-        pad_token_id=qa_pipeline.tokenizer.eos_token_id,  # Best practice for clean output
-        return_full_text=False
+        max_new_tokens=50,        
+        return_full_text=False,
+        num_beams=4,
+        do_sample=False,
+        repetition_penalty=1.2,
+        no_repeat_ngram_size=3,
+        length_penalty=1.0,
+        early_stopping=True
     )
 
-    context = "\n".join(retrieved_chunks)
+    context = "\n\n".join(retrieved_chunks)
 
-    prompt = f"""
-    Answer the question using the context.
-    Context: {context}
-    Question: {question}
+    prompt = f"""    
+    Use the context to answer the question.    
+    
+    question: {question}
+
+    context: {context}
+    
+    answer:
     """
 
     result = qa_pipeline(prompt, generation_config=gen_config)

@@ -5,14 +5,14 @@ A lightweight, self-contained **Retrieval-Augmented Generation (RAG)** applicati
 ## Features
 
 - **Document Ingestion**: Upload `.txt` files which are automatically chunked and processed.
-- **Vector Search**: Uses **FAISS** and **Sentence Transformers** (`all-MiniLM-L6-v2`) for efficient semantic retrieval.
-- **Context-Aware QA**: Generates natural language answers using the **Google Flan-T5** model (`google/flan-t5-small`).
+- **Vector Search**: Uses **Qdrant** and **Sentence Transformers** (`all-MiniLM-L6-v2`) for efficient semantic retrieval.
+- **Context-Aware QA**: Generates natural language answers using the **Google Flan-T5** model (`google/flan-t5-base`).
 
 ## Tech Stack
 
 - **Framework**: FastAPI, Uvicorn
 - **ML/NLP**: Hugging Face Transformers, Sentence-Transformers, PyTorch
-- **Vector Store**: FAISS (CPU)
+- **Vector Store**: Qdrant
 
 ## Installation
 
@@ -69,7 +69,7 @@ The API will be accessible at `http://localhost:8000`.
   ```
 - **`POST /ask`**: Ask a question based on the uploaded documents.
   ```bash
-  curl -X POST http://127.0.0.1:8000/ask -H "Content-Type: application/json" -d "{\"question\":\"How hugging face helpful to AI community?\"}"
+  curl -X POST http://127.0.0.1:8000/ask -H "Content-Type: application/json" -d "{\"question\":\"What are advantages of using docker?\"}"
   ```
 
 ## License
