@@ -22,6 +22,7 @@ from sentence_transformers import SentenceTransformer
 from transformers import pipeline, GenerationConfig
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
+from groq import Groq
 
 # uncomment below to check available tasks
 # from transformers.pipelines import PIPELINE_REGISTRY
@@ -32,6 +33,12 @@ load_dotenv()
 HF_TOKEN = os.getenv("HF_TOKEN")
 if HF_TOKEN:
     os.environ["HF_TOKEN"] = HF_TOKEN
+
+groq_client = None
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if GROQ_API_KEY:
+    groq_client = Groq(api_key=GROQ_API_KEY)
+
 
 # Load embedding model
 model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -159,7 +166,16 @@ def ask_question(question):
     answer:
     """
 
-    result = qa_pipeline(prompt, generation_config=gen_config)
-    answer = result[0]["generated_text"]
+    if groq_client:
+        response = groq_client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[
+                            {"role": "user", "content": prompt}
+                        ]
+                    )
+        answer = response.choices[0].message.content
+    else:
+        result = qa_pipeline(prompt, generation_config=gen_config)
+        answer = result[0]["generated_text"]
 
     return answer, similarity_score

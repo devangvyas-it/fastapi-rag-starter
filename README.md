@@ -1,17 +1,17 @@
 # FastAPI RAG Starter
 
-A lightweight, self-contained **Retrieval-Augmented Generation (RAG)** application built with **FastAPI**. This API allows users to upload text documents, automatically indexes them for semantic search, and answers questions based on the uploaded content using a locally running Large Language Model (LLM).
+A lightweight, self-contained **Retrieval-Augmented Generation (RAG)** application built with **FastAPI**. This API allows users to upload text documents, automatically indexes them for semantic search, and answers questions based on the uploaded content using either a high-performance cloud LLM (Groq) or a locally running model.
 
 ## Features
 
 - **Document Ingestion**: Upload `.txt` files which are automatically chunked and processed.
 - **Vector Search**: Uses **Qdrant** and **Sentence Transformers** (`all-MiniLM-L6-v2`) for efficient semantic retrieval.
-- **Context-Aware QA**: Generates natural language answers using the **Google Flan-T5** model (`google/flan-t5-base`).
+- **Context-Aware QA**: Generates natural language answers using **Groq** (`llama-3.3-70b-versatile`) for speed and quality, falling back to **Google Flan-T5-Base** (`google/flan-t5-base`) for local execution.
 
 ## Tech Stack
 
 - **Framework**: FastAPI, Uvicorn
-- **ML/NLP**: Hugging Face Transformers, Sentence-Transformers, PyTorch
+- **ML/NLP**: Hugging Face Transformers, Sentence-Transformers, PyTorch, Groq API
 - **Vector Store**: Qdrant
 
 ## Installation
@@ -41,10 +41,14 @@ A lightweight, self-contained **Retrieval-Augmented Generation (RAG)** applicati
    pip install -r requirements.txt
    ```
 
-4. **Configuration (Optional):**
-   Create a `.env` file in the root directory if you need to provide a Hugging Face token:
+4. **Configuration:**
+   Create a `.env` file in the root directory.
+   - `HF_TOKEN` (Optional): For accessing gated Hugging Face models.
+   - `GROQ_API_KEY` (Optional): If provided, the system uses Groq's Llama 3 model. If missing, it defaults to the local Flan-T5 model.
+
    ```ini
    HF_TOKEN=your_hugging_face_token
+   GROQ_API_KEY=your_groq_api_key
    ```
 
 ## Usage
