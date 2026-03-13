@@ -45,10 +45,18 @@ A lightweight, self-contained **Retrieval-Augmented Generation (RAG)** applicati
    Create a `.env` file in the root directory.
    - `HF_TOKEN` (Optional): For accessing gated Hugging Face models.
    - `GROQ_API_KEY` (Optional): If provided, the system uses Groq's Llama 3 model. If missing, it defaults to the local Flan-T5 model.
+   - `CHUNK_SIZE` (Optional): Character size for text splitting (default: 300).
+   - `CHUNK_OVERLAP` (Optional): Character overlap for text splitting (default: 50).
+   - `SIMILARITY_THRESHOLD` (Optional): Cosine similarity threshold (0.0-1.0) for filtering relevant chunks (default: 0.5).
+   - `RETRIEVAL_LIMIT` (Optional): Number of chunks to retrieve (default: 3).
 
    ```ini
    HF_TOKEN=your_hugging_face_token
    GROQ_API_KEY=your_groq_api_key
+   CHUNK_SIZE=300
+   CHUNK_OVERLAP=50
+   SIMILARITY_THRESHOLD=0.5
+   RETRIEVAL_LIMIT=3
    ```
 
 ## Usage

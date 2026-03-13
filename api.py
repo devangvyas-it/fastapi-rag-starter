@@ -17,7 +17,7 @@ from schema import QuestionRequest, UploadResponse, AskResponse
 import os
 
 # Import your RAG logic
-from rag_engine import process_document, ask_question
+from rag_engine import process_document, ask_question, SIMILARITY_THRESHOLD
 
 router = APIRouter()
 
@@ -60,10 +60,7 @@ def ask(request: QuestionRequest):
     try:
         answer, similarity = ask_question(request.question)
 
-        # Safety threshold
-        threshold = 0.50
-
-        if similarity < threshold:
+        if similarity < SIMILARITY_THRESHOLD:
             return AskResponse(
                 answer="I could not find relevant information in the uploaded document.",
                 similarity_score=similarity

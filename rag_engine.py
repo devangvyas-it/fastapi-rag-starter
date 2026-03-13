@@ -49,6 +49,12 @@ qa_pipeline = pipeline(
             device=-1
         )
 
+# Configurable parameters
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 300))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 50))
+SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", 0.5))
+RETRIEVAL_LIMIT = int(os.getenv("RETRIEVAL_LIMIT", 3))
+
 # vector db client
 db_client = None
 
@@ -72,10 +78,6 @@ def get_db_client():
                 )
             )
     return db_client
-
-# Chunk size (characters)
-CHUNK_SIZE = 300
-CHUNK_OVERLAP = 50
 
 def chunk_text(text):
     text_splitter = RecursiveCharacterTextSplitter(
@@ -121,19 +123,17 @@ def ask_question(question):
     question_embedding = model.encode(question, normalize_embeddings=True)
 
     # Search vector DB
-    k = 3
     # Ensure we don't ask for more results than exist    
     client = get_db_client()
     search_results = client.query_points(collection_name=collection_name,
                                         query=question_embedding.tolist(),
-                                        limit=k)    
+                                        limit=RETRIEVAL_LIMIT)
 
     if not search_results.points:
-        return "Could not find any relevant chunks.", 0.0
+        return "Could not find any relevant chunks.", 0.0    
 
     # Filter results based on a similarity threshold (e.g., 0.5)
-    threshold = 0.5
-    relevant_points = [point for point in search_results.points if point.score >= threshold]
+    relevant_points = [point for point in search_results.points if point.score >= SIMILARITY_THRESHOLD]
 
     if not relevant_points:
         return "Could not find any relevant chunks above the threshold.", 0.0
