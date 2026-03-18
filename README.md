@@ -1,3 +1,9 @@
+## 🌐 Connect with me
+
+- 🎥 YouTube: [Python School](https://www.youtube.com/@pythonschool-py)
+
+If you find this helpful, please don't forget to **like and subscribe** to the channel!
+
 # FastAPI RAG Starter
 
 A lightweight, self-contained **Retrieval-Augmented Generation (RAG)** application built with **FastAPI**. This API allows users to upload text documents, automatically indexes them for semantic search, and answers questions based on the uploaded content using either a high-performance cloud LLM (Groq) or a locally running model.
@@ -49,6 +55,7 @@ A lightweight, self-contained **Retrieval-Augmented Generation (RAG)** applicati
    - `CHUNK_OVERLAP` (Optional): Character overlap for text splitting (default: 50).
    - `SIMILARITY_THRESHOLD` (Optional): Cosine similarity threshold (0.0-1.0) for filtering relevant chunks (default: 0.5).
    - `RETRIEVAL_LIMIT` (Optional): Number of chunks to retrieve (default: 3).
+   - `QDRANT_URL` (Optional): URL for a remote Qdrant server (e.g., Qdrant Cloud or Docker container). If not set, it defaults to local disk storage.
 
    ```ini
    HF_TOKEN=your_hugging_face_token
@@ -57,6 +64,7 @@ A lightweight, self-contained **Retrieval-Augmented Generation (RAG)** applicati
    CHUNK_OVERLAP=50
    SIMILARITY_THRESHOLD=0.5
    RETRIEVAL_LIMIT=3
+   QDRANT_URL=http://localhost:6333
    ```
 
 ## Usage
