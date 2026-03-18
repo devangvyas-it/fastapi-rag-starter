@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from schema import QuestionRequest, UploadResponse, AskResponse
 import os
+import shutil
 
 # Import your RAG logic
 from rag_engine import process_document, ask_question, SIMILARITY_THRESHOLD
@@ -29,7 +30,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Upload TXT file
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     
     if not file.filename.endswith(".txt"):
         raise HTTPException(status_code=400, detail="Only .txt files are supported")
@@ -37,15 +38,16 @@ async def upload_file(file: UploadFile = File(...)):
     file_path = os.path.join(UPLOAD_DIR, file.filename)
 
     try:
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+        # Stream the file to disk to save memory
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-        # Process document (chunking + embeddings + store in vector DB)
-        process_document(file_path)
+        # Offload processing to background task
+        # This prevents the API from timing out on large files
+        background_tasks.add_task(process_document, file_path)
 
         return UploadResponse(
-            message="File uploaded and processed successfully",
+            message="File uploaded. Processing started in background.",
             filename=file.filename
         )
 

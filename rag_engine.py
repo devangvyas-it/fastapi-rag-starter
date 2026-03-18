@@ -15,6 +15,7 @@
 import os
 import uuid
 import numpy as np
+import logging
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 from qdrant_client.models import VectorParams, Distance
@@ -29,6 +30,9 @@ from groq import Groq
 # print(PIPELINE_REGISTRY.get_supported_tasks())
 
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 if HF_TOKEN:
@@ -54,6 +58,7 @@ CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 300))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 50))
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", 0.5))
 RETRIEVAL_LIMIT = int(os.getenv("RETRIEVAL_LIMIT", 3))
+QDRANT_URL = os.getenv("QDRANT_URL", None) # Support remote Qdrant
 
 # vector db client
 db_client = None
@@ -65,7 +70,13 @@ collection_name = "docs"
 def get_db_client():
     global db_client
     if db_client is None:
-        db_client = QdrantClient(path=EMBEDDING_DIR)
+        if QDRANT_URL:
+            # Production: Connect to server
+            db_client = QdrantClient(url=QDRANT_URL)
+        else:
+            # Local Development: Use disk storage
+            db_client = QdrantClient(path=EMBEDDING_DIR)
+            
         collections = db_client.get_collections().collections
         collection_names = [c.name for c in collections]
 
@@ -91,30 +102,36 @@ def chunk_text(text):
 
 
 def process_document(file_path):
-    # Read file
-    with open(file_path, "r", encoding="utf-8") as f:
-        text = f.read()
+    try:
+        logging.info(f"Starting processing for: {file_path}")
+        
+        # Read file
+        with open(file_path, "r", encoding="utf-8") as f:
+            text = f.read()
 
-    # Split text
-    chunks = chunk_text(text)
-    # Generate embeddings
-    embeddings = model.encode(chunks, normalize_embeddings=True)       
+        # Split text
+        chunks = chunk_text(text)
+        # Generate embeddings
+        embeddings = model.encode(chunks, normalize_embeddings=True)       
 
-    embedding_data = []
-    for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-       embedding_data.append(
-            PointStruct(
-                id=str(uuid.uuid4()),
-                vector=embedding.tolist(),
-                payload={"text": chunk}
+        embedding_data = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+            embedding_data.append(
+                PointStruct(
+                    id=str(uuid.uuid4()),
+                    vector=embedding.tolist(),
+                    payload={"text": chunk, "source": os.path.basename(file_path)}
+                )
             )
-        )
 
-    client = get_db_client()
-    client.upsert(
-        collection_name=collection_name,
-        points=embedding_data
-    )  
+        client = get_db_client()
+        client.upsert(
+            collection_name=collection_name,
+            points=embedding_data
+        )
+        logging.info(f"Successfully processed {len(chunks)} chunks for {file_path}")
+    except Exception as e:
+        logging.error(f"Error processing document {file_path}: {str(e)}")
 
 
 def ask_question(question):   
